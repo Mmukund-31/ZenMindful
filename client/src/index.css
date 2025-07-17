@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 11% 98%; /* #F8FAFB */
+  --foreground: 215 25% 27%; /* #2C3E50 */
+  --muted: 210 11% 91%; /* #E8F4F8 */
+  --muted-foreground: 215 14% 45%; /* #718096 */
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 25% 27%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 25% 27%;
+  --border: 210 12% 82%; /* #D1E7F0 */
+  --input: 210 12% 82%;
+  --primary: 207 90% 54%; /* #4A90E2 */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 84 69% 74%; /* #7ED321 */
+  --secondary-foreground: 84 20% 20%;
+  --accent: 38 92% 58%; /* #F5A623 */
+  --accent-foreground: 38 20% 20%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 207 90% 54%;
+  --radius: 0.75rem;
+  --chart-1: 207 90% 54%;
+  --chart-2: 84 69% 74%;
+  --chart-3: 38 92% 58%;
+  --chart-4: 271 81% 56%;
+  --chart-5: 0 84% 60%;
+}
+
+.dark {
+  --background: 222 84% 5%;
+  --foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --popover: 222 84% 5%;
+  --popover-foreground: 210 40% 98%;
+  --card: 222 84% 5%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --primary: 207 90% 54%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 84 69% 74%;
+  --secondary-foreground: 84 20% 20%;
+  --accent: 38 92% 58%;
+  --accent-foreground: 38 20% 20%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 207 90% 54%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  }
+
+  .mood-card:hover {
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+  }
+
+  .chat-bubble {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .nav-tab.active {
+    color: hsl(var(--primary));
+  }
+
+  /* Mobile-first touch targets and accessibility */
+  @media (max-width: 640px) {
+    .nav-tab {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    .mood-emoji {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    button {
+      min-height: 44px;
+    }
+  }
+
+  /* Improved focus states for accessibility */
+  button:focus-visible,
+  .nav-tab:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-pulse-gentle {
+    animation: pulseGentle 2s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulseGentle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Scrollbar styling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar for chat */
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
