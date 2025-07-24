@@ -28,10 +28,19 @@ export default function Challenges() {
 
   const joinChallengeMutation = useMutation({
     mutationFn: async (challengeId: string) => {
-      const response = await apiRequest("POST", "/api/challenges/join", { challengeId });
-      return response.json();
+      console.log('Joining challenge with ID:', challengeId);
+      try {
+        const response = await apiRequest("POST", "/api/challenges/join", { challengeId });
+        const data = await response.json();
+        console.log('Join challenge response:', data);
+        return data;
+      } catch (error) {
+        console.error('Join challenge API error:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Challenge joined successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['/api/challenges/active'] });
       queryClient.invalidateQueries({ queryKey: ['/api/challenges/available'] });
       toast({
@@ -39,7 +48,8 @@ export default function Challenges() {
         description: "Good luck on your wellness journey!",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Join challenge error:", error);
       toast({
         title: "Failed to start challenge",
         description: "Please try again.",
@@ -385,7 +395,23 @@ export default function Challenges() {
                             <div className="flex justify-end space-x-2">
                               <Button variant="outline">Cancel</Button>
                               <Button 
-                                onClick={() => joinChallengeMutation.mutate(challenge.id)}
+                                onClick={() => {
+                                  try {
+                                    console.log('Starting challenge with ID:', challenge.id);
+                                    if (!challenge.id) {
+                                      console.error('Challenge ID is undefined or null');
+                                      toast({
+                                        title: "Error",
+                                        description: "Invalid challenge ID",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    joinChallengeMutation.mutate(challenge.id);
+                                  } catch (error) {
+                                    console.error('Error in Start Challenge button click handler:', error);
+                                  }
+                                }}
                                 disabled={joinChallengeMutation.isPending}
                                 className="bg-blue-500 hover:bg-blue-600"
                               >

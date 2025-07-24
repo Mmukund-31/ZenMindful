@@ -189,6 +189,23 @@ export class DatabaseStorage implements IStorage {
 
   async getActiveChallengesByUser(userId: string): Promise<any[]> {
     try {
+      // First, check if the challenge_daily_progress table exists
+      try {
+        await db.execute(
+          sql.raw(`
+            CREATE TABLE IF NOT EXISTS challenge_daily_progress (
+              challenge_id VARCHAR NOT NULL,
+              user_id VARCHAR NOT NULL,
+              date DATE NOT NULL,
+              completed BOOLEAN NOT NULL DEFAULT false,
+              PRIMARY KEY (challenge_id, user_id, date)
+            )
+          `)
+        );
+      } catch (tableError) {
+        console.error("Error creating challenge_daily_progress table:", tableError);
+      }
+
       // Use raw SQL to query the actual database structure
       const result = await db.execute(
         sql.raw(`SELECT * FROM challenge_progress WHERE user_id = '${userId}'`)
@@ -207,6 +224,15 @@ export class DatabaseStorage implements IStorage {
           );
           
           const totalDays = (streakResult.rows && streakResult.rows[0]) ? Number((streakResult.rows[0] as any).total_days) : 0;
+          
+          // Update the completed count in the main progress table to keep it in sync
+          await db.execute(
+            sql.raw(`
+              UPDATE challenge_progress 
+              SET completed = ${totalDays}
+              WHERE user_id = '${userId}' AND challenge_id = '${p.challenge_id}'
+            `)
+          );
           
           return {
             challengeId: p.challenge_id,
@@ -265,24 +291,88 @@ export class DatabaseStorage implements IStorage {
 
   async joinChallenge(userId: string, challengeId: string): Promise<ChallengeProgress> {
     try {
-      // Execute direct SQL insertion to handle the schema properly
-      await db.execute(
+      console.log(`Joining challenge: userId=${userId}, challengeId=${challengeId}`);
+      
+      // First, check if the challenge_daily_progress table exists
+      try {
+        await db.execute(
+          sql.raw(`
+            CREATE TABLE IF NOT EXISTS challenge_daily_progress (
+              challenge_id VARCHAR NOT NULL,
+              user_id VARCHAR NOT NULL,
+              date DATE NOT NULL,
+              completed BOOLEAN NOT NULL DEFAULT false,
+              PRIMARY KEY (challenge_id, user_id, date)
+            )
+          `)
+        );
+      } catch (tableError) {
+        console.error("Error creating challenge_daily_progress table:", tableError);
+      }
+
+      // We don't need to modify the primary key constraint since the schema already defines 'id' as the primary key
+      // Just log that we're proceeding with the join operation
+      console.log(`Proceeding with join operation for userId=${userId}, challengeId=${challengeId}`);
+
+      // Check if this challenge is already joined by this user
+      const existingProgress = await db.execute(
+        sql.raw(`SELECT id FROM challenge_progress WHERE challenge_id = '${challengeId}' AND user_id = '${userId}'`)
+      );
+      
+      if (existingProgress.rows && existingProgress.rows.length > 0) {
+        console.log(`Challenge ${challengeId} already joined by user ${userId}, updating last_activity_date`);
+        // Update existing record
+        await db.execute(
+          sql.raw(`
+            UPDATE challenge_progress 
+            SET last_activity_date = NOW() 
+            WHERE challenge_id = '${challengeId}' AND user_id = '${userId}'
+          `)
+        );
+      } else {
+        console.log(`Creating new challenge progress for user ${userId}, challenge ${challengeId}`);
+        // Insert new record
+        await db.execute(
+          sql.raw(`
+            INSERT INTO challenge_progress (challenge_id, user_id, completed, start_date, last_activity_date, timestamp)
+            VALUES ('${challengeId}', '${userId}', 0, NOW(), NOW(), NOW())
+          `)
+        );
+      }
+      
+      // Get the actual challenge progress data to return
+      const progressResult = await db.execute(
         sql.raw(`
-          INSERT INTO challenge_progress (challenge_id, user_id, date, completed)
-          VALUES ('${challengeId}', '${userId}', NOW(), false)
-          ON CONFLICT DO NOTHING
+          SELECT id, challenge_id, user_id, completed, start_date, last_activity_date, timestamp 
+          FROM challenge_progress 
+          WHERE challenge_id = '${challengeId}' AND user_id = '${userId}'
         `)
       );
       
-      return {
-        id: Date.now(),
-        challengeId,
-        userId,
-        completed: 0,
-        startDate: new Date(),
-        lastActivityDate: null,
-        timestamp: new Date(),
-      };
+      if (progressResult.rows && progressResult.rows.length > 0) {
+        const progress = progressResult.rows[0] as any;
+        return {
+          id: progress.id,
+          challengeId: progress.challenge_id,
+          userId: progress.user_id,
+          completed: progress.completed || 0,
+          startDate: new Date(progress.start_date),
+          lastActivityDate: progress.last_activity_date ? new Date(progress.last_activity_date) : null,
+          timestamp: new Date(progress.timestamp),
+        };
+      } else {
+        // Fallback in case we can't retrieve the record we just created/updated
+        console.log(`Could not retrieve challenge progress, returning default values`);
+        return {
+          id: Date.now(),
+          challengeId,
+          userId,
+          completed: 0,
+          startDate: new Date(),
+          lastActivityDate: new Date(),
+          timestamp: new Date(),
+        };
+      }
     } catch (error) {
       console.error("Error joining challenge:", error);
       throw error;
@@ -300,6 +390,23 @@ export class DatabaseStorage implements IStorage {
 
   async updateChallengeProgress(userId: string, challengeId: string, completed: boolean, date?: string): Promise<ChallengeProgress> {
     try {
+      // First, check if the challenge_daily_progress table exists
+      try {
+        await db.execute(
+          sql.raw(`
+            CREATE TABLE IF NOT EXISTS challenge_daily_progress (
+              challenge_id VARCHAR NOT NULL,
+              user_id VARCHAR NOT NULL,
+              date DATE NOT NULL,
+              completed BOOLEAN NOT NULL DEFAULT false,
+              PRIMARY KEY (challenge_id, user_id, date)
+            )
+          `)
+        );
+      } catch (tableError) {
+        console.error("Error creating challenge_daily_progress table:", tableError);
+      }
+
       const targetDate = date ? new Date(date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
       
       if (completed) {
@@ -313,11 +420,12 @@ export class DatabaseStorage implements IStorage {
           `)
         );
         
-        // Update main progress table
+        // Update main progress table with last_activity_date
         await db.execute(
           sql.raw(`
             UPDATE challenge_progress 
-            SET completed = true, date = NOW() 
+            SET completed = (SELECT COUNT(*) FROM challenge_daily_progress WHERE user_id = '${userId}' AND challenge_id = '${challengeId}' AND completed = true),
+                last_activity_date = NOW() 
             WHERE user_id = '${userId}' AND challenge_id = '${challengeId}'
           `)
         );
@@ -334,12 +442,23 @@ export class DatabaseStorage implements IStorage {
       
       const totalDays = (streakResult.rows && streakResult.rows[0]) ? Number((streakResult.rows[0] as any).total_days) : 0;
       
+      // Get challenge start date
+      const startDateResult = await db.execute(
+        sql.raw(`
+          SELECT start_date FROM challenge_progress 
+          WHERE user_id = '${userId}' AND challenge_id = '${challengeId}'
+        `)
+      );
+      
+      const startDate = (startDateResult.rows && startDateResult.rows[0]) ? 
+        new Date((startDateResult.rows[0] as any).start_date) : new Date();
+      
       return {
         id: Date.now(),
         challengeId,
         userId,
         completed: totalDays,
-        startDate: new Date(),
+        startDate,
         lastActivityDate: new Date(),
         timestamp: new Date(),
       };
