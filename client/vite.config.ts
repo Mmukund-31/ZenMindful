@@ -2,8 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// https://vitejs.dev/config/
 export default defineConfig({
+  root: '.', // keep the default root
+  build: {
+    outDir: 'dist', // Firebase will serve this
+    emptyOutDir: true,
+  },
   plugins: [react()],
   resolve: {
     alias: {
